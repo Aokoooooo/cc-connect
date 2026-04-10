@@ -7979,7 +7979,7 @@ func (e *Engine) cmdCron(p Platform, msg *Message, args []string) {
 	}
 
 	sub := matchSubCommand(strings.ToLower(args[0]), []string{
-		"add", "addexec", "list", "del", "delete", "rm", "remove", "enable", "disable", "mute", "unmute", "setup",
+		"add", "addexec", "list", "run", "del", "delete", "rm", "remove", "enable", "disable", "mute", "unmute", "setup",
 	})
 	switch sub {
 	case "add":
@@ -7988,6 +7988,8 @@ func (e *Engine) cmdCron(p Platform, msg *Message, args []string) {
 		e.cmdCronAddExec(p, msg, args[1:])
 	case "list":
 		e.cmdCronList(p, msg)
+	case "run":
+		e.cmdCronRun(p, msg, args[1:])
 	case "del", "delete", "rm", "remove":
 		e.cmdCronDel(p, msg, args[1:])
 	case "enable":
@@ -8125,6 +8127,26 @@ func (e *Engine) cmdCronList(p Platform, msg *Message) {
 
 	sb.WriteString(fmt.Sprintf("\n%s", e.i18n.T(MsgCronListFooter)))
 	e.reply(p, msg.ReplyCtx, sb.String())
+}
+
+func (e *Engine) cmdCronRun(p Platform, msg *Message, args []string) {
+	if len(args) == 0 {
+		e.reply(p, msg.ReplyCtx, e.i18n.T(MsgCronRunUsage))
+		return
+	}
+	id := args[0]
+	if err := e.cronScheduler.RunJobNow(id); err != nil {
+		switch {
+		case errors.Is(err, ErrCronJobNotFound):
+			e.reply(p, msg.ReplyCtx, fmt.Sprintf(e.i18n.T(MsgCronNotFound), id))
+		case errors.Is(err, ErrCronProjectNotFound):
+			e.reply(p, msg.ReplyCtx, e.i18n.T(MsgCronProjectUnavailable))
+		default:
+			e.reply(p, msg.ReplyCtx, e.i18n.Tf(MsgError, err))
+		}
+		return
+	}
+	e.reply(p, msg.ReplyCtx, fmt.Sprintf(e.i18n.T(MsgCronTriggered), id))
 }
 
 func (e *Engine) cmdCronDel(p Platform, msg *Message, args []string) {
